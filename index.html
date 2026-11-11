@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>제주 미세먼지</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="wrap">
+    <header>
+      <h1>제주 미세먼지</h1>
+      <p class="sub">공공데이터 → FastAPI 가공·예측 → Supabase 저장 → 이 화면은 결과만 받아 표시</p>
+      <p class="status" id="status">백엔드 연결 확인 중…</p>
+    </header>
+
+    <section class="summary" id="summary" hidden></section>
+
+    <section>
+      <table>
+        <thead>
+          <tr><th>측정소</th><th>시각</th><th>PM10</th><th>PM2.5</th><th>예측</th></tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </section>
+
+    <section class="pred" id="pred" hidden></section>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
