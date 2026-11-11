@@ -27,3 +27,13 @@ button:hover { background: #f0f3f6; }
 .g-매우나쁨 { background: #eb5757; }
 .pred { margin-top: 16px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px; }
 .pred small { color: var(--muted); }
+.dbstat { margin: 12px 0; padding: 10px 14px; background: #eef6ff; border: 1px solid #c7ddf5; border-radius: 10px; font-size: 14px; line-height: 1.6; }
+.dbstat small { color: var(--muted); }
+.chart { margin-top: 10px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.chart small { color: var(--muted); }
+.chart svg { display: block; width: 100%; height: auto; margin-top: 6px; }
+.chart .grid { stroke: var(--line); stroke-width: 1; }
+.chart .axis { fill: var(--muted); font-size: 11px; }
+.chart .series { fill: none; stroke: #0b5cad; stroke-width: 2; }
+.chart .forecast { stroke: #eb5757; stroke-width: 2; stroke-dasharray: 5 4; }
+.chart .predpt { fill: #eb5757; }

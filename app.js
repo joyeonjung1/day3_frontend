@@ -23,17 +23,58 @@ async function getJSON(path) {
   return r.json();
 }
 
+// 시간별 기록(실선)과 1시간 뒤 예측값(점선·빨간 점)을 한 그래프로
+function drawChart(station, hist, predicted) {
+  const pts = hist.filter((h) => h.pm10 != null);
+  if (pts.length < 2) return '<small>그래프를 그릴 기록이 아직 부족합니다.</small>';
+  const W = 640, H = 170, L = 38, R = 14, T = 14, B = 30;
+  const vals = pts.map((p) => p.pm10);
+  const all = predicted != null ? vals.concat(predicted) : vals;
+  const lo = Math.max(0, Math.floor(Math.min(...all) / 10) * 10 - 10);
+  const hi = Math.ceil(Math.max(...all) / 10) * 10 + 10;
+  const n = pts.length + (predicted != null ? 1 : 0);
+  const x = (i) => L + (i * (W - L - R)) / Math.max(1, n - 1);
+  const y = (v) => T + ((hi - v) * (H - T - B)) / (hi - lo);
+  const line = pts.map((p, i) => `${x(i).toFixed(1)},${y(p.pm10).toFixed(1)}`).join(' ');
+  const last = pts.length - 1;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(station)} PM10 시간별 추이">`;
+  for (const g of [lo, (lo + hi) / 2, hi]) {
+    svg += `<line x1="${L}" x2="${W - R}" y1="${y(g)}" y2="${y(g)}" class="grid"/>` +
+           `<text x="${L - 6}" y="${y(g) + 4}" text-anchor="end" class="axis">${Math.round(g)}</text>`;
+  }
+  svg += `<polyline points="${line}" class="series"/>`;
+  if (predicted != null) {
+    svg += `<line x1="${x(last)}" y1="${y(vals[last])}" x2="${x(last + 1)}" y2="${y(predicted)}" class="forecast"/>` +
+           `<circle cx="${x(last + 1)}" cy="${y(predicted)}" r="5" class="predpt"/>` +
+           `<text x="${x(last + 1)}" y="${y(predicted) - 9}" text-anchor="end" class="axis">예측 ${predicted}</text>`;
+  }
+  svg += `<text x="${L}" y="${H - 8}" class="axis">${esc(pts[0].time.slice(5))}</text>` +
+         `<text x="${x(last)}" y="${H - 8}" text-anchor="end" class="axis">${esc(pts[last].time.slice(5))}</text></svg>`;
+  return `<b>${esc(station)}</b> PM10 시간별 기록 <small>(DB에 쌓인 ${pts.length}개${predicted != null ? ' + 1시간 뒤 예측' : ''})</small>${svg}`;
+}
+
 async function load() {
   try {
-    const [health, summary, rows] = await Promise.all([
+    const [health, summary, rows, stats] = await Promise.all([
       getJSON('/health'),
       getJSON('/air/summary'),
       getJSON('/air/latest'),
+      getJSON('/air/stats'),
     ]);
 
     $('status').textContent =
-      `연결됨 · ${API} · 모드: ${health.mode === 'demo' ? '연습 데이터' : '에어코리아 실데이터'} · 저장소: ${health.store}`;
+      `연결됨 · ${API} · 모드: ${health.mode === 'demo' ? '연습 데이터' : '에어코리아 실데이터'}` +
+      `${health.demo_reason ? ' (' + health.demo_reason + ')' : ''} · 저장소: ${health.store}`;
     $('status').className = 'status ok';
+
+    // Supabase에 실제로 쌓이고 있는지 한눈에
+    const d = $('dbstat');
+    d.hidden = false;
+    d.innerHTML =
+      `<b>🗄 DB 저장 현황</b> (${esc(stats.mode === 'demo' ? '연습' : '실데이터')}) · ` +
+      `누적 <b>${esc(stats.rows)}</b>건 · 수집 <b>${esc(stats.runs)}</b>회` +
+      (stats.first ? ` · ${esc(stats.first)} ~ ${esc(stats.last)}` : '') +
+      `<br><small>서버가 1시간마다 새 값을 받아 같은 측정소·같은 시각은 덮어쓰고, 새 시각은 계속 쌓습니다.</small>`;
 
     const s = $('summary');
     s.hidden = false;
@@ -60,17 +101,24 @@ async function load() {
 $('rows').addEventListener('click', async (ev) => {
   const btn = ev.target.closest('button[data-st]');
   if (!btn) return;
-  const p = $('pred');
+  const p = $('pred'), c = $('chart');
+  const st = encodeURIComponent(btn.dataset.st);
   p.hidden = false;
   p.textContent = '예측 중…';
   try {
-    const d = await getJSON('/air/predict?station=' + encodeURIComponent(btn.dataset.st));
+    const [d, hist] = await Promise.all([
+      getJSON('/air/predict?station=' + st),
+      getJSON('/air/history?limit=48&station=' + st),
+    ]);
     p.innerHTML = d.ready
       ? `<b>${esc(d.station)}</b> 1시간 뒤 PM10 약 <b>${esc(d.next_pm10)}</b> ${badge(d.next_grade)} ` +
         `<small>(평균 오차 ±${esc(d.avg_error)} · 학습 데이터 ${esc(d.points)}개 · ${esc(d.model)})</small>`
       : esc(d.message);
+    c.hidden = false;
+    c.innerHTML = drawChart(btn.dataset.st, hist, d.ready ? d.next_pm10 : null);
   } catch (e) {
     p.textContent = '예측 실패: ' + e.message;
+    c.hidden = true;
   }
 });
 
