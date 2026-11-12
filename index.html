@@ -15,6 +15,22 @@
       <p class="status" id="status">백엔드 연결 확인 중…</p>
     </header>
 
+    <section class="wbox">
+      <div class="wcard">
+        <h2>실시간 날씨</h2>
+        <form id="w-form" class="w-form" autocomplete="off">
+          <div class="w-search">
+            <input id="w-q" type="text" autocomplete="off" role="combobox" aria-controls="w-list"
+                   placeholder="지역 입력 (첫 글자만 써도 추천: 서, 부, 평택, Seoul)">
+            <ul id="w-list" class="w-list" role="listbox" hidden></ul>
+          </div>
+          <button type="submit" class="w-btn">검색</button>
+        </form>
+        <small id="w-hint" class="w-hint"></small>
+        <div class="weather" id="weather" hidden></div>
+      </div>
+    </section>
+
     <section class="dbstat" id="dbstat" hidden></section>
 
     <section class="summary" id="summary" hidden></section>
@@ -40,5 +56,7 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="config.js"></script>
   <script src="app.js"></script>
+  <script src="cities.js"></script>
+  <script src="weather.js"></script>
 </body>
 </html>
