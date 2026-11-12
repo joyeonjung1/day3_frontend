@@ -53,6 +53,68 @@ function drawChart(station, hist, predicted) {
   return `<b>${esc(station)}</b> PM10 시간별 기록 <small>(DB에 쌓인 ${pts.length}개${predicted != null ? ' + 1시간 뒤 예측' : ''})</small>${svg}`;
 }
 
+// ─────────────── 지도 ───────────────
+// 측정소 좌표는 백엔드가 내려 줍니다. 여기서는 마커를 찍고,
+// 지도 클릭 지점에서 가장 가까운 측정소를 골라 값을 보여 주기만 합니다.
+let map = null;
+let stationLayer = null;
+let clickMarker = null;
+let mapStations = [];
+
+function initMap() {
+  if (map || typeof L === 'undefined') return;
+  map = L.map('map').setView([33.38, 126.55], 10); // 제주 전체가 보이게
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 18,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  }).addTo(map);
+  stationLayer = L.layerGroup().addTo(map);
+  map.on('click', onMapClick);
+}
+
+function popupHtml(r, extra) {
+  return `<div class="pop"><b>${esc(r.station)}</b>${extra ? ' <small>' + esc(extra) + '</small>' : ''}<br>` +
+    `PM10 <b>${esc(r.pm10 ?? '-')}</b> ${badge(r.pm10_grade)}<br>` +
+    `PM2.5 <b>${esc(r.pm25 ?? '-')}</b> ${badge(r.pm25_grade)}<br>` +
+    `<small>${esc(r.time)} 기준</small></div>`;
+}
+
+function drawMap(rows) {
+  initMap();
+  if (!map) {
+    $('maphint').textContent = '지도 라이브러리를 불러오지 못했습니다. 인터넷 연결을 확인하세요.';
+    return;
+  }
+  stationLayer.clearLayers();
+  mapStations = rows.filter((r) => r.lat != null && r.lng != null);
+  for (const r of mapStations) {
+    const icon = L.divIcon({
+      className: '',
+      html: `<div class="pin g-${r.pm10_grade || 'none'}">${esc(r.pm10 ?? '-')}</div>`,
+      iconSize: [30, 30], iconAnchor: [15, 15],
+    });
+    L.marker([r.lat, r.lng], { icon, title: r.station })
+      .bindPopup(popupHtml(r)).addTo(stationLayer);
+  }
+  const missing = rows.filter((r) => r.lat == null).map((r) => r.station);
+  $('maphint').textContent =
+    '지도를 클릭하면 그 지역에서 가장 가까운 측정소의 미세먼지를 보여 줍니다. 원 안 숫자는 PM10입니다.' +
+    (missing.length ? ` (위치 미등록 측정소: ${missing.join(', ')})` : '');
+}
+
+function onMapClick(ev) {
+  if (!mapStations.length) return;
+  let best = null, bestD = Infinity;
+  for (const r of mapStations) {
+    const d = map.distance(ev.latlng, [r.lat, r.lng]); // 미터
+    if (d < bestD) { bestD = d; best = r; }
+  }
+  if (clickMarker) clickMarker.remove();
+  clickMarker = L.circleMarker(ev.latlng, { radius: 6, color: '#1f2328', weight: 2, fillColor: '#fff', fillOpacity: 1 }).addTo(map);
+  const km = (bestD / 1000).toFixed(1);
+  clickMarker.bindPopup(popupHtml(best, `가장 가까운 측정소 · ${km}km`), { offset: [0, -4] }).openPopup();
+}
+
 async function load() {
   try {
     const [health, summary, rows, stats] = await Promise.all([
@@ -83,6 +145,8 @@ async function load() {
       `<div><b>${esc(summary.avg_pm10 ?? '-')}</b><span>평균 PM10 ${badge(summary.avg_pm10_grade)}</span></div>` +
       `<div><b>${esc(summary.avg_pm25 ?? '-')}</b><span>평균 PM2.5</span></div>` +
       `<div><b>${esc(summary.worst_station?.station ?? '-')}</b><span>가장 나쁜 곳</span></div>`;
+
+    drawMap(rows);
 
     $('rows').innerHTML = rows.map((r) => `
       <tr>
